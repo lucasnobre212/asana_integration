@@ -2,53 +2,57 @@ from flask import jsonify, request
 
 import asana
 from . import api
-from app.api.good_day_mock import get_good_day_project_id, receive_tasks
-from .oauth import asana_client
+from .oauth import asana_client, update_token
 from ..models import User
 
 
-def get_tasks(project_id: str, client: asana.Client):
+def get_tasks_gid(project_id: str, client: asana.Client):
+    return [x['gid'] for x in client.tasks.get_tasks(project=project_id)]
 
-    return ''
 
+# TODO: Create asana import workspaces
 
 @api.route('/asana/import/tasks/<int:user_id>', methods=['POST'])
 def import_asana_task(user_id):
     data = request.json
     user = User.query.filter_by(user_id=user_id).first()
-    token = ''
+    token = user.get_token()
     client = asana_client(token=token)
+    client = update_token(client, user)
     project_id = data['asanaProjectId']
-    good_day_project_id = get_good_day_project_id()
-    tasks = get_tasks(project_id, client)
+    tasks = get_project_tasks(client, project_id)
     if tasks:
         return jsonify({
             'Status': 'OK',
-            'goodday': receive_tasks(tasks, good_day_project_id)
+            'tasks': tasks
         })
     else:
         return jsonify({'Status': 'error'})
 
 
+def get_project_tasks(client, project_id):
+    tasks_gid = get_tasks_gid(project_id, client)
+    tasks = [client.tasks.get_task(gid) for gid in tasks_gid]
+    return tasks
 
-@api.route('/import/projects/<int:user_id>', methods=['POST'])
+
+@api.route('/asana/import/projects/<int:user_id>', methods=['POST'])
 def import_multiple_projects(user_id):
     data = request.json
-    token = User.query.filter_by(user_id=user_id).first().token
-    asana_projects_ids = data['asanaProjectIds']
-    if not isinstance(asana_projects_ids, list):
-        return jsonify({
-            'status': 'error',
-            'info': 'asanaProjectIds is not a list'
-        })
+    user = User.query.filter_by(user_id=user_id).first()
+    token = user.get_token()
+    client = asana_client(token=token)
+    client = update_token(client, user)
+    workspace_id = data['asanaWorkspaceId']
+    asana_projects_ids = [x['gid'] for x in client.projects.find_by_workspace(workspace_id)]
     projects_dict = {}
     failed_imports = []
-    for project in asana_projects_ids:
-        tasks = get_tasks(project, token)
+    for project_id in asana_projects_ids:
+        tasks = get_project_tasks(client, project_id)
         if tasks:
-            projects_dict[project] = tasks
+            projects_dict[project_id] = tasks
         else:
-            failed_imports.append(project)
+            failed_imports.append(project_id)
     if projects_dict:
         return jsonify({
             'status': 'OK',

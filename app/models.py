@@ -14,7 +14,12 @@ class User(db.Model):
 
     @hybrid_method
     def get_token(self):
-        token = self.__dict__
+        token = self.__dict__.copy()
         token.pop('user_id', None)
         token.pop('_sa_instance_state', None)
         return token
+
+    @hybrid_method
+    def update_access_token(self, access_token):
+        self.access_token = access_token
+        db.session.commit()

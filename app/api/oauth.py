@@ -16,8 +16,10 @@ def get_asana_oauth(user_id: int):
     if user:
         token = user.get_token()
         # if the user has a token they're logged in
-    # example request gets information about logged in user
-        me = asana_client(token=token).users.me()
+        # example request gets information about logged in user
+        client = asana_client(token=token)
+        client = update_token(client, user)
+        me = client.users.me()
         return jsonify({'user_name': me['name'], 'status': 'OK'})
     # if we don't have a token show a "Sign in with Asana" button
     else:
@@ -29,6 +31,14 @@ def get_asana_oauth(user_id: int):
         return render_template_string('<p><a href="{{ auth_url }}"><img src="https://luna1.co/7df202.png"></a></p>',
                                       auth_url=auth_url
                                       )
+
+
+def update_token(client, user):
+    new_token = client.session.refresh_token(client.session.token_url, client_id=client.session.client_id,
+                                             client_secret=client.session.client_secret)
+    user.update_access_token(new_token['access_token'])
+    db.session.commit()
+    return asana_client(token=new_token)
 
 
 def create_token_from_user_row(user):
