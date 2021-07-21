@@ -11,7 +11,7 @@ class Config:
     ASANA_CLIENT_ID = os.getenv('ASANA_CLIENT_ID')
     ASANA_SECRET = os.getenv('ASANA_SECRET')
     ASANA_REDIRECT_URL = 'https://6945844d186b.ngrok.io/api/v1/oauth/asana/callback'
-    SQLALCHEMY_DATABASE_URI = 'postgresql:///data'
+    SQLALCHEMY_DATABASE_URI = 'postgresql:///testasana'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = os.getenv('APP_SECRET_KEY')
 

@@ -12,13 +12,12 @@ def get_tasks_gid(project_id: str, client: asana.Client):
 
 # TODO: Create asana import workspaces
 
-@api.route('/asana/import/tasks/<int:user_id>', methods=['POST'])
+@api.route('/asana/import/tasks/<user_id>', methods=['POST'])
 def import_asana_task(user_id):
     data = request.json
-    user = Credential.query.filter_by(user_id=user_id).first()
-    token = user.get_token()
+    credential = Credential.query.filter_by(userId=user_id).first()
+    token = credential.credentials
     client = asana_client(token=token)
-    client = update_token(client, user)
     project_id = data['asanaProjectId']
     tasks = get_project_tasks(client, project_id)
     if tasks:
@@ -36,13 +35,12 @@ def get_project_tasks(client, project_id):
     return tasks
 
 
-@api.route('/asana/import/projects/<int:user_id>', methods=['POST'])
+@api.route('/asana/import/projects/<user_id>', methods=['POST'])
 def import_multiple_projects(user_id):
     data = request.json
-    user = Credential.query.filter_by(user_id=user_id).first()
-    token = user.get_token()
+    credential = Credential.query.filter_by(userId=user_id).first()
+    token = credential.credentials
     client = asana_client(token=token)
-    client = update_token(client, user)
     workspace_id = data['asanaWorkspaceId']
     asana_projects_ids = [x['gid'] for x in client.projects.find_by_workspace(workspace_id)]
     projects_dict = {}
