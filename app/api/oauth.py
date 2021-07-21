@@ -1,18 +1,16 @@
 import asana
 from flask import jsonify, session, request, redirect, render_template_string, current_app
 
-import json
-
 from . import api
 from .. import db
-from ..models import User
+from ..models import Credential
 
 
 @api.route('/oauth/asana/authorize/<user_id>')
 def get_asana_oauth(user_id: int):
     session.clear()
     session['user_id'] = user_id
-    user = User.query.filter_by(user_id=user_id).first()
+    user = Credential.query.filter_by(userId=user_id).first()
     if user:
         token = user.get_token()
         # if the user has a token they're logged in
@@ -55,10 +53,9 @@ def auth_callback():
         del session['state']
         # exchange the code for a bearer token and persist it in the user's session or database
         token = asana_client().session.fetch_token(code=request.args.get('code'))
-        session['token'] = token
-        user = {**token, 'user_id': session.get('user_id')}
+        user = {**token, 'userId': session.get('user_id')}
         user.pop('data', None)
-        new_user = User(**user)
+        new_user = Credential(**user)
         db.session.add(new_user)
         db.session.commit()
         return redirect(f'/api/v1/oauth/asana/authorize/{session.get("user_id")}')

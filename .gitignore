@@ -6,14 +6,14 @@
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
 # Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
 
-# User-specific stuff
+# Credential-specific stuff
 .idea/**/workspace.xml
 .idea/**/tasks.xml
 .idea/**/usage.statistics.xml
 .idea/**/dictionaries
 .idea/**/shelf
 
-# AWS User-specific
+# AWS Credential-specific
 .idea/**/aws.xml
 
 # Generated files
@@ -72,7 +72,7 @@ crashlytics.properties
 crashlytics-build.properties
 fabric.properties
 
-# Editor-based Rest User
+# Editor-based Rest Credential
 .idea/httpRequests
 
 # Android studio 3.1+ serialized cache file

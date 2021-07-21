@@ -1,25 +1,10 @@
-from sqlalchemy.ext.hybrid import hybrid_method
+from sqlalchemy.dialects.postgresql import JSONB
 
 from . import db
 
 
-class User(db.Model):
-    __tablename__ = 'users'
-    user_id = db.Column(db.String(40), primary_key=True)
-    refresh_token = db.Column(db.String(255), unique=True)
-    access_token = db.Column(db.String(255), unique=True)
-    expires_at = db.Column(db.Float)
-    expires_in = db.Column(db.Integer)
-    token_type = db.Column(db.String(16))
-
-    @hybrid_method
-    def get_token(self):
-        token = self.__dict__.copy()
-        token.pop('user_id', None)
-        token.pop('_sa_instance_state', None)
-        return token
-
-    @hybrid_method
-    def update_access_token(self, access_token):
-        self.access_token = access_token
-        db.session.commit()
+class Credential(db.Model):
+    __tablename__ = 'import_credentials'
+    userId = db.Column(db.String(63), primary_key=True)
+    companyId = db.Column(db.String(255), primary_key=True)
+    credentials = db.Column(JSONB)

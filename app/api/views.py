@@ -3,7 +3,7 @@ from flask import jsonify, request
 import asana
 from . import api
 from .oauth import asana_client, update_token
-from ..models import User
+from ..models import Credential
 
 
 def get_tasks_gid(project_id: str, client: asana.Client):
@@ -15,7 +15,7 @@ def get_tasks_gid(project_id: str, client: asana.Client):
 @api.route('/asana/import/tasks/<int:user_id>', methods=['POST'])
 def import_asana_task(user_id):
     data = request.json
-    user = User.query.filter_by(user_id=user_id).first()
+    user = Credential.query.filter_by(user_id=user_id).first()
     token = user.get_token()
     client = asana_client(token=token)
     client = update_token(client, user)
@@ -39,7 +39,7 @@ def get_project_tasks(client, project_id):
 @api.route('/asana/import/projects/<int:user_id>', methods=['POST'])
 def import_multiple_projects(user_id):
     data = request.json
-    user = User.query.filter_by(user_id=user_id).first()
+    user = Credential.query.filter_by(user_id=user_id).first()
     token = user.get_token()
     client = asana_client(token=token)
     client = update_token(client, user)
