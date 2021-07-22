@@ -11,6 +11,7 @@ python-dotenv = "*"
 requests = "*"
 asana = "*"
 pyopenssl = "*"
+psycopg2-binary = "*"
 
 [dev-packages]
 

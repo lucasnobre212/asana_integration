@@ -1,61 +1,106 @@
 from flask import jsonify, request
+from asana.error import AsanaError
 
-import asana
+from fields_mapping import get_asana_to_goodday_mapping
 from . import api
-from app.api.good_day_mock import get_good_day_project_id, receive_tasks
 from .oauth import asana_client
-from ..models import User
+from ..models import Credential
 
 
-def get_tasks(project_id: str, client: asana.Client):
-
-    return ''
-
-
-@api.route('/asana/import/tasks/<int:user_id>', methods=['POST'])
-def import_asana_task(user_id):
-    data = request.json
-    user = User.query.filter_by(user_id=user_id).first()
-    token = ''
+@api.route('/import/asana/<user_id>/workspaces')
+def import_workspaces(user_id):
+    credential = Credential.query.filter_by(userId=user_id).first()
+    token = credential.credentials
     client = asana_client(token=token)
-    project_id = data['asanaProjectId']
-    good_day_project_id = get_good_day_project_id()
-    tasks = get_tasks(project_id, client)
-    if tasks:
-        return jsonify({
-            'Status': 'OK',
-            'goodday': receive_tasks(tasks, good_day_project_id)
-        })
-    else:
-        return jsonify({'Status': 'error'})
-
-
-
-@api.route('/import/projects/<int:user_id>', methods=['POST'])
-def import_multiple_projects(user_id):
-    data = request.json
-    token = User.query.filter_by(user_id=user_id).first().token
-    asana_projects_ids = data['asanaProjectIds']
-    if not isinstance(asana_projects_ids, list):
-        return jsonify({
-            'status': 'error',
-            'info': 'asanaProjectIds is not a list'
-        })
-    projects_dict = {}
-    failed_imports = []
-    for project in asana_projects_ids:
-        tasks = get_tasks(project, token)
-        if tasks:
-            projects_dict[project] = tasks
+    try:
+        workspaces = [x for x in client.workspaces.get_workspaces()]
+        if workspaces:
+            return jsonify({
+                'Status': 'OK',
+                'workspaces': workspaces
+            })
         else:
-            failed_imports.append(project)
-    if projects_dict:
+            return jsonify({'Status': 'error'})
+    except AsanaError as e:
+        print(e)
         return jsonify({
-            'status': 'OK',
-            'projects': projects_dict,
-            'failed_imports': failed_imports,
+            'Status': 'error'
         })
-    else:
+
+
+
+@api.route('/import/asana/<user_id>/workspace/<workspace_id>/projects')
+def import_projects(user_id, workspace_id):
+    credential = Credential.query.filter_by(userId=user_id).first()
+    token = credential.credentials
+    client = asana_client(token=token)
+    asana_projects = [x for x in client.projects.find_by_workspace(workspace_id)]
+    try:
+        if asana_projects:
+            return jsonify({
+                'status': 'OK',
+                'projects': asana_projects,
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+            })
+    except AsanaError as e:
+        print(e)
         return jsonify({
-            'status': 'error',
+            'Status': 'error'
         })
+
+
+@api.route('/import/asana/<user_id>/project/<project_id>/tasks')
+def import_tasks(user_id, project_id):
+    credential = Credential.query.filter_by(userId=user_id).first()
+    token = credential.credentials
+    client = asana_client(token=token)
+    try:
+        tasks = get_project_tasks(client, project_id)
+        goodday_tasks = tasks_to_goodday(tasks)
+        if tasks:
+            return jsonify({
+                'Status': 'OK',
+                'tasks': goodday_tasks
+            })
+        else:
+            return jsonify({'Status': 'error'})
+    except AsanaError as e:
+        print(e)
+        return jsonify({
+            'Status': 'error'
+        })
+
+
+def tasks_to_goodday(tasks):
+    goodday_tasks = []
+    asana_to_goodday = get_asana_to_goodday_mapping()
+    for task in tasks:
+        gday_task = {asana_to_goodday.get(k, k): v for k, v in task.items()}
+        goodday_tasks.append(gday_task)
+    # Some information has to be retrieved from inside a dict
+    for task in goodday_tasks:
+        if task.get('createdForUserId'):
+            task['createdForUserId'] = task['createdForUserId'].get('gid')
+        if task.get('tags'):
+            task['tags'] = [tag.get('gid') for tag in task['tags']]
+        if task.get('projectId'):
+            task['projectId'] = task['projectId'][0]['gid']
+        if task.get('parentTaskId'):
+            task['parentTaskId'] = task['parentTaskId'].get('gid')
+    return goodday_tasks
+
+
+def get_project_tasks(client, project_id):
+    fields = ['notes', 'name', 'due_at', 'created_at', 'num_subtasks', 'start_at', 'assignee.gid',
+              'custom_fields', 'permalink_url', 'tags.gid', 'projects.gid', 'parent', 'approval_status',
+              ]
+    tasks = [x for x in client.tasks.get_tasks(project=project_id, fields=fields)]
+    subtasks = []
+    for task in tasks:
+        if task['num_subtasks'] > 0:
+            subtasks.append(*[x for x in client.tasks.get_subtasks_for_task(task['gid'], fields=fields)])
+    tasks = tasks + subtasks
+    return tasks

@@ -1,0 +1,33 @@
+def get_asana_to_goodday_mapping():
+    goodday_dict = {
+        'gid': 'Id',
+        # 'createdByUserId': 'createdByUserId',
+        'assignee': 'createdForUserId',
+        'projects': 'projectId',
+        'parent': 'parentTaskId',
+        # '': 'parentGroupId',
+        'name': 'title',
+        'notes': 'message',
+        # '': 'messageRTF',
+        # '': 'attachments',
+        # '': 'taskTypeId',
+        # '': 'systemType',
+        # '': 'priority',
+        # '': 'estimate',
+        # '': 'progress',
+        # '': 'deadlineDate',
+        # '': 'scheduleStatus',
+        'created_at': 'scheduleDate',
+        'start_at': 'planningStartDate',
+        'due_at': 'planningEndDate',
+        # '': 'createdOnBehalfUserId',
+        # '': 'arrWatchers',
+        'approval_status': 'statusId',
+        # '': 'isTemplate',
+        'custom_fields': 'customFieldsData',
+        'permalink_url': 'source',
+        # '': 'momentCreated',
+        # '': 'momentClosed',
+        'tags': 'tags'
+    }
+    return goodday_dict
