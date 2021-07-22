@@ -1,5 +1,5 @@
 from flask import jsonify, request
-import asana
+from asana.error import AsanaError
 
 from fields_mapping import get_asana_to_goodday_mapping
 from . import api
@@ -7,37 +7,48 @@ from .oauth import asana_client
 from ..models import Credential
 
 
-@api.route('/import/asana/workspaces/<user_id>', methods=['POST'])
+@api.route('/import/asana/<user_id>/workspaces')
 def import_workspaces(user_id):
     credential = Credential.query.filter_by(userId=user_id).first()
     token = credential.credentials
     client = asana_client(token=token)
-    workspaces = client.session.get_project_workspaces()
-    if workspaces:
+    try:
+        workspaces = [x for x in client.workspaces.get_workspaces()]
+        if workspaces:
+            return jsonify({
+                'Status': 'OK',
+                'workspaces': workspaces
+            })
+        else:
+            return jsonify({'Status': 'error'})
+    except AsanaError as e:
+        print(e)
         return jsonify({
-            'Status': 'OK',
-            'workspaces': workspaces
+            'Status': 'error'
         })
-    else:
-        return jsonify({'Status': 'error'})
 
 
-@api.route('/import/asana/projects/<user_id>', methods=['POST'])
-def import_projects(user_id):
-    data = request.json
+
+@api.route('/import/asana/<user_id>/workspace/<workspace_id>/projects')
+def import_projects(user_id, workspace_id):
     credential = Credential.query.filter_by(userId=user_id).first()
     token = credential.credentials
     client = asana_client(token=token)
-    workspace_id = data['asanaWorkspaceId']
     asana_projects = [x for x in client.projects.find_by_workspace(workspace_id)]
-    if asana_projects:
+    try:
+        if asana_projects:
+            return jsonify({
+                'status': 'OK',
+                'projects': asana_projects,
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+            })
+    except AsanaError as e:
+        print(e)
         return jsonify({
-            'status': 'OK',
-            'projects': asana_projects,
-        })
-    else:
-        return jsonify({
-            'status': 'error',
+            'Status': 'error'
         })
 
 
@@ -46,16 +57,21 @@ def import_tasks(user_id, project_id):
     credential = Credential.query.filter_by(userId=user_id).first()
     token = credential.credentials
     client = asana_client(token=token)
-    tasks = get_project_tasks(client, project_id)
-    goodday_tasks = tasks_to_goodday(tasks)
-    if tasks:
+    try:
+        tasks = get_project_tasks(client, project_id)
+        goodday_tasks = tasks_to_goodday(tasks)
+        if tasks:
+            return jsonify({
+                'Status': 'OK',
+                'tasks': goodday_tasks
+            })
+        else:
+            return jsonify({'Status': 'error'})
+    except AsanaError as e:
+        print(e)
         return jsonify({
-            'Status': 'OK',
-            'tasks': goodday_tasks
+            'Status': 'error'
         })
-    else:
-        return jsonify({'Status': 'error'})
-
 
 
 def tasks_to_goodday(tasks):
@@ -64,6 +80,7 @@ def tasks_to_goodday(tasks):
     for task in tasks:
         gday_task = {asana_to_goodday.get(k, k): v for k, v in task.items()}
         goodday_tasks.append(gday_task)
+    # Some information has to be retrieved from inside a dict
     for task in goodday_tasks:
         if task.get('createdForUserId'):
             task['createdForUserId'] = task['createdForUserId'].get('gid')

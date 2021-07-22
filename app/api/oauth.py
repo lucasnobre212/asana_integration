@@ -6,7 +6,7 @@ from .. import db
 from ..models import Credential
 
 
-@api.route('/oauth/asana/authorize/<user_id>/<company_id>')
+@api.route('/oauth/asana/<user_id>/<company_id>/authorize')
 def get_asana_oauth(user_id: str, company_id: str):
     credential = Credential.query.filter_by(userId=user_id).first()
     if credential:
@@ -36,13 +36,6 @@ def update_token(client, credential):
     credential.credentials = new_token
     db.session.commit()
     return asana_client(token=new_token)
-
-
-def create_token_from_user_row(user):
-    token = user.__dict__
-    token.pop('user_id', None)
-    token.pop('_sa_instance_state', None)
-    return token
 
 
 @api.route("/oauth/asana/callback")
