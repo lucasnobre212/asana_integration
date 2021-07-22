@@ -1,63 +1,89 @@
 from flask import jsonify, request
-
 import asana
+
+from fields_mapping import get_asana_to_goodday_mapping
 from . import api
-from .oauth import asana_client, update_token
+from .oauth import asana_client
 from ..models import Credential
 
 
-def get_tasks_gid(project_id: str, client: asana.Client):
-    return [x['gid'] for x in client.tasks.get_tasks(project=project_id)]
-
-
-# TODO: Create asana import workspaces
-
-@api.route('/asana/import/tasks/<user_id>', methods=['POST'])
-def import_asana_task(user_id):
-    data = request.json
+@api.route('/import/asana/workspaces/<user_id>', methods=['POST'])
+def import_workspaces(user_id):
     credential = Credential.query.filter_by(userId=user_id).first()
     token = credential.credentials
     client = asana_client(token=token)
-    project_id = data['asanaProjectId']
-    tasks = get_project_tasks(client, project_id)
-    if tasks:
+    workspaces = client.session.get_project_workspaces()
+    if workspaces:
         return jsonify({
             'Status': 'OK',
-            'tasks': tasks
+            'workspaces': workspaces
         })
     else:
         return jsonify({'Status': 'error'})
 
 
-def get_project_tasks(client, project_id):
-    tasks_gid = get_tasks_gid(project_id, client)
-    tasks = [client.tasks.get_task(gid) for gid in tasks_gid]
-    return tasks
-
-
-@api.route('/asana/import/projects/<user_id>', methods=['POST'])
-def import_multiple_projects(user_id):
+@api.route('/import/asana/projects/<user_id>', methods=['POST'])
+def import_projects(user_id):
     data = request.json
     credential = Credential.query.filter_by(userId=user_id).first()
     token = credential.credentials
     client = asana_client(token=token)
     workspace_id = data['asanaWorkspaceId']
-    asana_projects_ids = [x['gid'] for x in client.projects.find_by_workspace(workspace_id)]
-    projects_dict = {}
-    failed_imports = []
-    for project_id in asana_projects_ids:
-        tasks = get_project_tasks(client, project_id)
-        if tasks:
-            projects_dict[project_id] = tasks
-        else:
-            failed_imports.append(project_id)
-    if projects_dict:
+    asana_projects = [x for x in client.projects.find_by_workspace(workspace_id)]
+    if asana_projects:
         return jsonify({
             'status': 'OK',
-            'projects': projects_dict,
-            'failed_imports': failed_imports,
+            'projects': asana_projects,
         })
     else:
         return jsonify({
             'status': 'error',
         })
+
+
+@api.route('/import/asana/<user_id>/project/<project_id>/tasks')
+def import_tasks(user_id, project_id):
+    credential = Credential.query.filter_by(userId=user_id).first()
+    token = credential.credentials
+    client = asana_client(token=token)
+    tasks = get_project_tasks(client, project_id)
+    goodday_tasks = tasks_to_goodday(tasks)
+    if tasks:
+        return jsonify({
+            'Status': 'OK',
+            'tasks': goodday_tasks
+        })
+    else:
+        return jsonify({'Status': 'error'})
+
+
+
+def tasks_to_goodday(tasks):
+    goodday_tasks = []
+    asana_to_goodday = get_asana_to_goodday_mapping()
+    for task in tasks:
+        gday_task = {asana_to_goodday.get(k, k): v for k, v in task.items()}
+        goodday_tasks.append(gday_task)
+    for task in goodday_tasks:
+        if task.get('createdForUserId'):
+            task['createdForUserId'] = task['createdForUserId'].get('gid')
+        if task.get('tags'):
+            task['tags'] = [tag.get('gid') for tag in task['tags']]
+        if task.get('projectId'):
+            task['projectId'] = task['projectId'][0]['gid']
+        if task.get('parentTaskId'):
+            task['parentTaskId'] = task['parentTaskId'].get('gid')
+    return goodday_tasks
+
+
+def get_project_tasks(client, project_id):
+    fields = ['notes', 'name', 'due_at', 'created_at', 'num_subtasks', 'start_at', 'assignee.gid',
+              'custom_fields', 'permalink_url', 'tags.gid', 'projects.gid', 'parent', 'approval_status',
+              ]
+    tasks = [x for x in client.tasks.get_tasks(project=project_id, fields=fields)]
+    subtasks = []
+    for task in tasks:
+        if task['num_subtasks'] > 0:
+            subtasks.append(*[x for x in client.tasks.get_subtasks_for_task(task['gid'], fields=fields)])
+    tasks = tasks + subtasks
+    return tasks
